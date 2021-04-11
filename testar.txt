@@ -1,0 +1,165 @@
+const express = require('express')
+app = express()
+const port = 3000
+
+const MongoClient = require('mongodb').MongoClient
+const uri = "mongodb+srv://usuarioPadrao:5GOPljGxfNBwPVtd@projeto8.96xow.mongodb.net/Projeto8?retryWrites=true&w=majority";
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true })
+
+app.use(express.json())
+app.use(express.urlencoded( { extended: false } ))
+
+console.log('Iniciando conexão ao banco de dados...')
+
+// Instancia alguns registros padrão para os testes
+const registro1 = {
+    "datahora": "2021-03-23T17:01:19.667Z",
+    "registro": 1,
+    "hospital": "Hospital Central",
+    "qexames": 3,
+    "paciente": "José João",
+    "idade": 54,
+    "prestador": "Empresa 1",
+    "plantonista": "Doutor 1",
+    "distancia": 120,
+    "obs": "morte cerebral, acidente, sem doenças pré existentes"
+}
+
+const registro2 = {
+    "datahora": "2020-03-23T17:01:19.667Z",
+    "registro": 2,
+    "hospital": "Hospital Central",
+    "qexames": 3,
+    "paciente": "Maria do Céu",
+    "idade": 40,
+    "prestador": "Empresa 1",
+    "plantonista": "Doutor 2",
+    "distancia": 120,
+    "obs": "morte cerebral, acidente, sem doenças pré existentes"
+}
+
+const registro3 = {
+    "datahora": "2021-03-23T18:34:26.483Z",
+    "registro": 3,
+    "hospital": "Hospital Central",
+    "qexames": 1,
+    "paciente": "Joana Alex",
+    "idade": 20,
+    "prestador": "Empresa 2",
+    "plantonista": "Doutor 1",
+    "distancia": 120,
+    "obs": "morte cerebral, com doença pré existente"
+}
+
+const registro4 = {
+    "datahora": "2021-03-23T18:34:26.483Z",
+    "registro": 4,
+    "hospital": "Hospital das Clínicas",
+    "qexames": 2,
+    "paciente": "João Leão",
+    "idade": 56,
+    "prestador": "Empresa 1",
+    "plantonista": "Doutor 2",
+    "distancia": 40,
+    "obs": "morte cerebral, acidente, sem doenças pré existentes"
+}
+
+const registro5 = {
+    "datahora": "2021-03-23T18:34:26.483Z",
+    "registro": 5,
+    "hospital": "Hospital das Clínicas",
+    "qexames": 1,
+    "paciente": "Katia Kay",
+    "idade": 33,
+    "prestador": "Empresa 2",
+    "plantonista": "Doutor 2",
+    "distancia": 40,
+    "obs": "morte cerebral, com doença pré existente"
+}
+
+const registrosPadrao = [registro1, registro2, registro3, registro4, registro5]
+
+client.connect(err => {
+
+    const transportes = client.db("Projeto8").collection("transportes")
+    console.log('Banco conectado com sucesso')
+
+    // 6) Implemente uma consulta para obter o nome dos
+    // hospitais com distância inferior a uma distância passada
+    // por parâmetro, usando o construtor RegExp.
+    app.get('/hospitais/:distancia', async (req, res) => {
+        filter = {distancia: { $lt: parseInt(req.params.distancia) }}
+        msg = await transportes.find(filter).toArray()
+        res.send(msg)
+    })
+
+    // 7) Implemente uma consulta para obter o nome
+    // dos pacientes de um hospital cujo nome foi parcialmente
+    // fornecido por parâmetro(a cadeia de caracteres pode
+    // estar em qualquer parte do nome) usando o construtor
+    // RegExp.
+    app.get('/pacientes/:nome', async (req, res) => {
+        console.log(req.params.nome)
+        filter = {paciente: { $regex: new RegExp(req.params.nome) }}
+        msg = await transportes.find(filter).toArray()
+        res.send(msg)
+    })
+
+    // 8)Implemente uma consulta para obter o nome dos hospitais
+    // com distância em um intervalo passado por parâmetro,
+    // usando o construtor RegExp.
+    app.get('/hospitais/distancia/:inicio/:fim', async (req, res) => {
+        inicio = parseInt(req.params.inicio)
+        fim = parseInt(req.params.fim)
+        filter = {distancia: { $gte: inicio, $lte: fim }}
+        msg = await transportes.find(filter).toArray()
+        res.send(msg)
+    })
+
+    // 9) Implemente uma função que altere em todos os
+    // documentos de um determinado hospital (recebido por
+    // parâmetro) por uma nova distância (recebida por
+    // parâmetro).
+    app.post('/hospitais/:hospital/:novaDistancia', async (req, res) => {
+        console.log('im here')
+        hospital = req.params.hospital
+        distancia = parseInt(req.params.novaDistancia)
+        filter = { "hospital": hospital }
+        updateQuery = { $set: { "distancia": distancia } }
+        msg = await transportes.updateMany(filter, updateQuery)
+        console.log(msg)
+    })
+
+
+    //10) Implemente uma função que remova um paciente por número 
+    //do registro passado por parâmetro.
+    app.delete('/pacientes/:registro',async(req,res) =>{
+        console.log(req.params.registro)
+        const registro = req.params.registro.toString;
+        await transportes.deleteOne({ registro: (registro)});
+        res.send('Paciente removido com sucesso');
+    })
+
+    // 11) Implemente uma função que remova todos os pacientes
+    // que não tiveram morte cerebral.
+    app.delete('/pacientes/:motivo',async(req,res)=>{
+        console.log(req.params.motivo)
+        const motivo = req.params.motivo.toString;
+        await transportes.deleteMany({obs: { $regex: new RegExp(req.params.motivo) }});
+        res.send('Paciente(s) removido(s) com sucesso') 
+    })
+
+
+    // OPCIONAL: Reseta os dados do banco para os dados padrão para testes.
+    app.get('/reiniciar', (req, res) => {
+        transportes.deleteMany({})
+        transportes.insertMany(registrosPadrao).then(result => {
+            console.log(result)
+            res.send('Inserido com sucesso!')
+        }).catch(error => console.error(error))
+    })
+
+    app.listen(port, _ => console.log(`Servidor rodando na porta ${port}`))
+
+    // client.close()
+})
